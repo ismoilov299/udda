@@ -16,7 +16,7 @@ Executing:
 
 class DataBase:
     order_id_counter = 1010
-    def __init__(self, path_to_db='/Users/ismoilov299/Desktop/aiogram-bot-template-master 2/back/db.sqlite3'):
+    def __init__(self, path_to_db='back/db.sqlite3'):
         self.path_to_db = path_to_db
 
 
