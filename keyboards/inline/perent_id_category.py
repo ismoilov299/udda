@@ -28,7 +28,8 @@ async def handle_category_callback(callback: CallbackQuery, state: FSMContext):
     keyboard.add(back_button)
 
     # Send the keyboard to the user
-    await callback.message.edit_text(text=TEXT_ORDER[lang_id], reply_markup=keyboard)
+    await callback.message.delete()
+    await callback.message.answer(text=TEXT_ORDER[lang_id], reply_markup=keyboard)
 
 @dp.callback_query_handler(lambda callback: callback.data == 'back_to_root')
 async def handle_back_to_root_callback(callback: CallbackQuery, state: FSMContext):

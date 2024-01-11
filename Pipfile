@@ -7,6 +7,9 @@ name = "pypi"
 aiogram = "~=2.14"
 environs = "~=8.0.0"
 pandas = "*"
+matplotlib = "*"
+faker = "*"
+seaborn = "*"
 
 [dev-packages]
 

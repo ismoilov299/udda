@@ -1,10 +1,18 @@
 import asyncio
-import datetime
+import sqlite3
+from datetime import datetime, timedelta
 import traceback
-
-import pandas as pd
 from io import BytesIO
-from aiogram.types import InputFile
+import seaborn as sns
+from faker import Faker
+import random
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import openpyxl
+import pandas as pd
+import numpy as np
+from io import BytesIO
+from aiogram.types import InputFile, ParseMode
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Command
@@ -20,7 +28,7 @@ from states.userStates import SendUserMessageAdmin, AdminBroadcast
 
 
 async def inform_admin_about_order(order_id, user_id, product_ids, latitude, longitude, amounts):
-    admin_chat_id = 1161180912
+    admin_chat_id = -4130678749
 
     print(user_id)
     lang_id = db.get_user_language_id(user_id)
@@ -39,9 +47,11 @@ async def inform_admin_about_order(order_id, user_id, product_ids, latitude, lon
         "Deactivate",
         callback_data=f"deactivate_{user_id}"
     )
-    user = db.get_all_users(user_id)
+    user = db.get_user_by_chat_id(user_id)
+    print(user,'user')
     user_name = user[1]
     shop_name = user[6]
+    user_phone = user[4]
 
     # Add both buttons to the keyboard
     keyboard_send_message.add(send_message_button, deactivate_button)
@@ -50,11 +60,12 @@ async def inform_admin_about_order(order_id, user_id, product_ids, latitude, lon
         # Initialize a message to send order details
         orders_message = (f"<b>Yengi buyurtmalar:</b>\n\n"
                           "<i>Buyurtmalar holati active</>\n"
-                          f"Buyurtmachi: {shop_name} dan {user_name} \n\n")
+                          f"👤Buyurtmachi: {shop_name} dan {user_name} "
+                          f"📞Buyurtmachining raqami: +{user_phone} \n\n")
 
 
         for order in orders:
-            print(orders)
+            print(user)
             # Process each order
             order_id = order['order_id']  # Correct column name for order_id
             order_status = order['status']
@@ -83,8 +94,8 @@ async def inform_admin_about_order(order_id, user_id, product_ids, latitude, lon
                     orders_message += product_message
 
         # Send the consolidated message with all order details
-        orders_message+= f"\nJammi summa: {total_sum} {SUM[lang_id]}"
-        print(orders_message)
+        orders_message+= f"\nJammi summa: {total_sum} "
+        print(user)
 
         await bot.send_message(chat_id=admin_chat_id, text=orders_message, reply_markup=keyboard_send_message, parse_mode='html')
         await bot.send_location(chat_id=admin_chat_id,longitude=longitude,latitude=latitude)
@@ -100,13 +111,17 @@ async def process_deactivate_callback(query: CallbackQuery, state: FSMContext):
 
     # Send a response to the user
     try:
-        await bot.answer_callback_query(query.id, text="Buyurtmalar o'chirildi", show_alert=True)
+        await bot.answer_callback_query(query.id, text="Ajoyib yana bitta buyurtmani yetkazib berdik 🎉 ", show_alert=True)
     except MessageNotModified:
         pass
-
+    delivery_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    await query.message.delete_reply_markup()
+    await query.message.reply(f'Buyurtma yetkazildi ✅ \n'
+                              f'yetkazib berilgan vaqt: {delivery_time}\n'
+                              f'yetkazib beruvchi {query.from_user.full_name}')
     # Optionally, you can also update the message that triggered the callback
-    await bot.edit_message_text("Buyurtma yetkaiz berildi!\n"
-                                "yetkazib berilgan vaqti", query.message.chat.id, query.message.message_id)
+    # await bot.edit_message_text("Buyurtma yetkazib berildi!\n"
+    #                             "yetkazib berilgan vaqti", query.message.chat.id, query.message.message_id)
 
 
 
@@ -145,7 +160,7 @@ async def send_user_message_callback(query: CallbackQuery, state: FSMContext):
 
 async def check_admin(user_id: int) -> bool:
     # Implement the logic to check if the user is an admin (e.g., check against a list of admin IDs)
-    admins = [1161180912, 1111111]  # Replace with actual admin IDs
+    admins = [1161180912]  # Replace with actual admin IDs
     return user_id in admins
 
 @dp.message_handler(text='All users')
@@ -167,7 +182,7 @@ async def cmd_all_users(message: types.Message):
 
 async def check_admin(user_id: int) -> bool:
     # Implement the logic to check if the user is an admin (e.g., check against a list of admin IDs)
-    admins = [1161180912, 987654321]  # Replace with actual admin IDs
+    admins = [1161180912]  # Replace with actual admin IDs
     return user_id in admins
 
 @dp.message_handler(text='Broadcast')
@@ -180,7 +195,7 @@ async def cmd_broadcast(message: types.Message):
         await message.answer("Barcha foydalanuvchilarga uzatmoqchi bo'lgan xabarni kiriting:")
         await AdminBroadcast.BROADCAST.set()
     else:
-        await message.answer("Siz admin huquqlariga ega emasiz")
+        await message.answer("Kechirasiz! Siz admin huquqlariga ega emasiz.Bu buyruqdan faqat admin foydalana oladi")
 
 
 @dp.message_handler(state=AdminBroadcast.BROADCAST)
@@ -202,77 +217,212 @@ async def process_broadcast(message: types.Message, state: FSMContext):
             print(f"Error sending broadcast message to user {user[3]}: {e}")
 
     # Notify the admin that the broadcast is complete
-    await message.answer("Habaringiz barcha userlarga bordi!")
+    await message.answer("Habaringiz barcha foydalanuvchilarga bordi!")
 
     # Reset the state
     await state.finish()
 
+import io
 
-@dp.message_handler(commands=['day'])
-async def cmd_day(message: types.Message):
+
+@dp.message_handler(Command("xisobot"))
+async def on_command_day(message: types.Message):
+    is_admin = await check_admin(message.from_user.id)
+
+    if is_admin:
+        try:
+            # Получение текущей даты
+            today_date = datetime.now().strftime('%Y-%m-%d')
+
+            # Подключение к базе данных SQLite
+            conn = sqlite3.connect('back/db.sqlite3')
+            cursor = conn.cursor()
+
+            # Вывод SQL-запроса с алиасами таблиц и столбцов в консоль
+            sql_query = f"""
+                WITH OrderIds AS (
+                    SELECT DISTINCT order_id
+                    FROM bot_app_order
+                    WHERE strftime(?, bot_app_order.created_at) = '{today_date}'
+                )
+                SELECT 
+                    op.amount AS количество_товара,
+                    op.created_at AS дата_создания_заказа,
+                    bot_app_user.first_name AS имя_пользователя,
+                    bot_app_user.phone_number AS номер_телефона_пользователя,
+                    bot_app_user.shop_name AS название_магазина,
+                    bot_app_product.name_uz AS наименование_товара,
+                    bot_app_product.price AS цена_товара,
+                    bot_app_product.price * op.amount AS общая_стоимость_товара
+                FROM 
+                    bot_app_orderproduct op
+                JOIN 
+                    OrderIds o ON op.id = o.order_id
+                JOIN 
+                    bot_app_user ON bot_app_user.chat_id = op.user_id
+                JOIN 
+                    bot_app_product ON bot_app_product.id = op.product_id
+            """
+
+            print("Executing SQL query:")
+            print(sql_query)
+
+            # Выполнение SQL-запроса с использованием текущей даты
+            cursor.execute(sql_query, ('%Y-%m-%d',))
+
+            # Получение результатов запроса
+            results = cursor.fetchall()
+
+            # Создание файла Excel
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            # headers = ["Maxsulot soni", "Sana", "Buyurtmachining ismi", "Telefon raqami",
+            #            #                    "Do'kon nomi", "Maxsulot nomi", "Narxi", "Ummumiy narxi"]
+            # Заголовки
+            headers = ["Maxsulot soni", "Sana", "Buyurtmachining ismi", "Telefon raqami",
+                       "Do'kon nomi", "Maxsulot nomi", "Narxi", "Ummumiy narxi"]
+            ws.append(headers)
+
+            # Добавление данных
+            total_sales = 0  # Общая стоимость всех товаров
+            for row in results:
+                ws.append(row)
+                total_sales += row[-1]  # Общая стоимость товара находится в последнем столбце
+
+            # Добавление строки с общей стоимостью
+            total_row = ["Ummumiy kunlik savdo", "", "", "", "", "", "", total_sales]
+            ws.append(total_row)
+
+            # Создание временного файла Excel
+            excel_file = io.BytesIO()
+            wb.save(excel_file)
+            excel_file.seek(0)
+
+            # Отправка файла Excel пользователю
+            await message.answer_document(InputFile(excel_file, filename=f"hisobot_{today_date}.xlsx"))
+
+        except Exception as e:
+            print(e)
+            await message.answer("Bazada ma'lumotlar mavjud emsa")
+
+        finally:
+            # Закрытие соединения с базой данных
+            conn.close()
+
+    else:
+        await message.answer("Kechirasiz! Siz admin huquqlariga ega emasiz.Bu buyruqdan faqat admin foydalana oladi")
+
+
+fake = Faker()
+
+
+@dp.message_handler(commands=['test_stat'])
+async def test_statistic_command(message: types.Message):
     try:
-        # Check if the user is an admin
-        is_admin = await check_admin(message.from_user.id)
+        sns.set_theme(style="darkgrid")
 
-        if is_admin:
-            # Check for a valid database connection
-            if db:
-                # Extract the date from the command arguments (e.g., "/day 2023-12-23")
-                date_args = message.get_args()
-                if date_args:
-                    # Attempt to parse the date in a flexible manner
-                    try:
-                        # Parse the date in a flexible manner
-                        parsed_date = datetime.datetime.strptime(date_args, '%Y-%m-%d').date()
-                        # Convert the parsed date back to the string in the 'YYYY-MM-DD' format
-                        date = parsed_date.strftime('%Y-%m-%d')
 
-                        # Print the date for debugging
-                        print("Date:", date)
+        fake_results = []
 
-                        # Get order product details from the database for the specified date
-                        order_product_details = db.get_order_product_details(date)
-                        print("Order Product Details:", order_product_details)
 
-                        # Check if order_product_details is not empty
-                        if order_product_details:
-                            # Convert the result to a DataFrame using pandas
-                            df = pd.DataFrame(order_product_details,
-                                              columns=['amount', 'created_at', 'first_name', 'phone_number',
-                                                       'shop_name', 'product_name_uz'])
+        for _ in range(100):
+            date = fake.date_between(start_date='-7d', end_date='today')
+            count = random.randint(1, 10)
+            fake_results.append((date, 'M3 qisqich 1mm', count))
 
-                            # Create an Excel file in memory
-                            excel_file = BytesIO()
 
-                            # Use pd.ExcelWriter and specify the engine
-                            with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
-                                df.to_excel(writer, index=False, sheet_name='Order_Product_Details')
+        for _ in range(100):
+            date = fake.date_between(start_date='-7d', end_date='today')
+            count = random.randint(1, 10)
+            fake_results.append((date, 'Model 2 qisqich', count))
 
-                            # Move the cursor to the beginning of the file
-                            excel_file.seek(0)
 
-                            # Save the Excel file to a specific location (e.g., within your project directory)
-                            file_path = f'order_product_details_{date}.xlsx'
-                            with open(file_path, 'wb') as file:
-                                file.write(excel_file.read())
+        for _ in range(50):
+            date = fake.date_between(start_date='-7d', end_date='today')
+            count = random.randint(1, 10)
+            fake_results.append((date, 'M2 Xanjar', count))
 
-                            # Send a confirmation message to the admin
-                            await message.answer(f"Order Product Details for {date} saved as {file_path}")
-                        else:
-                            await message.answer(f"No order product details found for the date: {date}")
-                    except ValueError:
-                        await message.answer("Noto'g'ri sana formati. Sana formati: 'YYYY-MM-DD'")
-                else:
-                    await message.answer("Iltimos, sanani kiritish uchun '/day YYYY-MM-DD' formatidan foydalaning.")
-            else:
-                await message.answer("Bot tezligi sababli, db ga ulanib bo'lmadi.")
-        else:
-            await message.answer("Siz admin emasiz.")
+
+        fake_results.extend(fake_results[-50:])
+
+        df = pd.DataFrame(fake_results, columns=['Sana', 'Maxsulot', 'Soni'])
+
+        plt.figure(figsize=(10, 6))
+        sns.countplot(data=df, x='Sana', hue='Maxsulot', palette='Set1')
+
+        plt.title('7 kunlik Statistka malumotlari')
+        plt.xlabel('Sana')
+        plt.ylabel('Maxsulot soni')
+
+
+        plt.legend(title='Maxsulot')
+
+        plt.grid(True)
+
+        chart_file = BytesIO()
+        plt.savefig(chart_file, format='png')
+        chart_file.seek(0)
+        plt.close()
+
+        await message.answer_photo(chart_file)
+
     except Exception as e:
-        # Log the exception for debugging
-        traceback.print_exc()
+        print(e)
+        await message.answer("Ma'lumotlarda qandaydur xatolik bor")
+@dp.message_handler(commands=['groupid'])
+async def get_group_id(message: types.Message):
+    chat_id = message.chat.id
+    await message.reply(f"Gruhning ID raqami: {chat_id}")
 
-        # Respond with an error message
-        await message.answer("Xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring.")
+@dp.message_handler(commands=['stats'])
+async def send_stats(message: types.Message):
+    is_admin = await check_admin(message.from_user.id)
+
+    if is_admin:
+
+        conn = sqlite3.connect('back/db.sqlite3')
+        cursor = conn.cursor()
+
+        today_date = datetime.now().strftime('%Y-%m-%d')
+        seven_days_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+        query = f"""
+            SELECT 
+                strftime('%Y-%m-%d', op.created_at) AS Sana,
+                bot_app_product.name_uz AS "Maxsulot nomi",
+                CAST(SUM(op.amount) AS INTEGER) AS Soni
+            FROM 
+                bot_app_orderproduct op
+            JOIN 
+                bot_app_product ON bot_app_product.id = op.product_id
+            WHERE 
+                op.created_at BETWEEN '{seven_days_ago}' AND '{today_date}'
+            GROUP BY Sana, "Maxsulot nomi"
+        """
+
+        cursor.execute(query)
+        result = cursor.fetchall()
 
 
+        import pandas as pd
+        df = pd.DataFrame(result, columns=['Date', 'Product', 'Amount'])
+
+        plt.figure(figsize=(10, 6))
+        sns.barplot(x='Date', y='Amount', hue='Product', data=df, palette='Set1')
+        sns.set_theme(style="darkgrid")
+        plt.yticks(range(0, max(df['Amount']) + 1, 1))
+
+        plt.xlabel('Sana')
+        plt.ylabel('Sonni')
+        plt.title('Oxirgi 7 kunlik mahsulot statistikasi')
+        plt.legend(title='Maxsulotlar')
+
+        plt.savefig('bar_plot.png')
+
+        conn.close()
+
+        photo = types.InputFile('bar_plot.png')
+        await message.reply_photo(photo, caption='Oxirgi 7 kunlik mahsulot statistikasi')
+
+    else:
+        await message.answer("Kechirasiz! Siz admin huquqlariga ega emasiz.Bu buyruqdan faqat admin foydalana oladi")

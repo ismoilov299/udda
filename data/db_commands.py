@@ -88,42 +88,58 @@ class DataBase:
         self.execute(sql, (user_id, comment_text, username), commit=True)
 
     def get_order_product_details(self, date=None):
-        # If date is not provided, use the current date
-        if date is None:
-            date = datetime.now().strftime('%Y-%m-%d')
-
-        query = """
-            WITH OrderIds AS (
-                SELECT DISTINCT order_id
-                FROM bot_app_order
-                WHERE strftime(?, created_at) = ?
-            )
-
-            SELECT 
-                op.amount,
-                op.created_at,
-                u.first_name,
-                u.phone_number,
-                u.shop_name,
-                p.name_uz AS product_name_uz
-            FROM 
-                bot_app_orderproduct op
-            JOIN 
-                OrderIds o ON op.id = o.order_id
-            JOIN 
-                bot_app_user u ON u.chat_id = op.user_id
-            JOIN 
-                bot_app_product p ON p.id = op.product_id;
-        """
-        parameters = (date, date)
-
         try:
+            # Если дата не предоставлена, используйте текущую дату
+            if date is None:
+                date = datetime.now().strftime('%Y-%m-%d')
+
+            query = """
+                WITH OrderIds AS (
+                    SELECT DISTINCT order_id
+                    FROM bot_app_order
+                    WHERE strftime('%Y-%m-%d', created_at) = ?
+                )
+
+                SELECT 
+                    op.amount,
+                    op.created_at,
+                    u.first_name,
+                    u.phone_number,
+                    u.shop_name,
+                    p.name_uz AS product_name_uz
+                FROM 
+                    bot_app_orderproduct op
+                JOIN 
+                    OrderIds o ON op.id = o.order_id
+                JOIN 
+                    bot_app_user u ON u.chat_id = op.user_id
+                JOIN 
+                    bot_app_product p ON p.id = op.product_id;
+            """
+
+            parameters = (date,)  # Используйте кортеж для параметра
+
+            # Выполните запрос
             result = self.execute(query, parameters)
 
-            # If result is None, return an empty list
-            return result if result is not None else []
+            # Проверка на None перед итерацией по результату
+            if result is None:
+                print("Error: Result is None.")
+                return []
+
+            # Вывести результат запроса для отладки
+            print("Query result:")
+            for row in result:
+                print(row)
+
+            # Если результат пуст, вернуть пустой список
+            if not result:
+                print("No data found.")
+                return []
+
+            return result
         except Exception as e:
-            # Log the error with traceback for detailed information
+            # Запись ошибки с трассировкой стека для детальной информации
             print(f"Error executing query: {e}")
             traceback.print_exc()
             return None

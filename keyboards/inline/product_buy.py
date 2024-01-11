@@ -104,9 +104,9 @@ async def process_shop_selection(query: CallbackQuery, state: FSMContext):
                         # Move to the next state 'Location'
                         await BuyAllProducts.Location.set()
                     except KeyError as e:
-                        await query.message.answer(f"KeyError: {e}. Some keys are missing in the shop_hierarchy result.")
+                        await query.message.answer(f"Xatolik: {e}.")
                 else:
-                    await query.message.answer("No shop information found for the given shop_id.")
+                    await query.message.answer("ma'lumot topilmadi")
         else:
             keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
             button_location = types.KeyboardButton(text="Lokatsiyangizni yuboring", request_location=True)

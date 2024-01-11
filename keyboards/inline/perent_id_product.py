@@ -7,7 +7,8 @@ from aiogram.dispatcher import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 from handlers.users.texts import TEXT_PRODUCT_PRICE, TEXT_PRODUCT_DESC, TEXT_MAIN_MENU, BTN_ORDER, BTN_MY_ORDERS, \
-    BTN_COMMENTS, BTN_SETTINGS, BTN_ABOUT_US, KORZINKA, BACK, BUY, CART, ALL, ORDER_NUMBER, SUM
+    BTN_COMMENTS, BTN_SETTINGS, BTN_ABOUT_US, KORZINKA, BACK, BUY, CART, ALL, ORDER_NUMBER, SUM, TEXT_ORDER, \
+    BTN_KORZINKA, AT_KORZINKA, NO_CART
 from loader import db, dp, bot
 
 
@@ -47,6 +48,8 @@ async def handle_product_callback(callback: CallbackQuery, state: FSMContext):
         InlineKeyboardButton('+', callback_data=f'plus_{product_id}_{num}'),
         InlineKeyboardButton(BUY[lang_id], callback_data=f'buy_{product_id}_{num}')
     )
+    back_button = InlineKeyboardButton(text=BACK[lang_id], callback_data="category_1")
+    price_keyboard1.add(back_button)
 
     product = db.get_product_by_id(product_id)
     print(product, ' product info')
@@ -60,7 +63,7 @@ async def handle_product_callback(callback: CallbackQuery, state: FSMContext):
 
     message_text = (f"{product_name}\n"
                     f"{TEXT_PRODUCT_DESC[lang_id]} {product_description}\n"
-                    f"{TEXT_PRODUCT_PRICE[lang_id]} {product_price}")
+                    f"{TEXT_PRODUCT_PRICE[lang_id]} {product_price} ")
 
     if product_image_path:
         # Construct the absolute file path
@@ -152,24 +155,118 @@ async def on_buy_button_clicked(callback: CallbackQuery, state: FSMContext):
     product = db.get_product_by_id(product_id)
     print(product)
     price = product[7]
-    total_price = product[7] * num
+    total_price = round(product[7] * num, 2)
     if lang_id == 1:
         name = product[1]
     else:
         name = product[2]
+
+
 
     # await callback.message.delete_reply_markup()
     message_text = (f"{CART[lang_id]}\n\n"
                     f"{name}\n\n"
                     f"{TEXT_PRODUCT_PRICE[lang_id]} {price} {SUM[lang_id]}\n\n"
                     f"{ORDER_NUMBER[lang_id]} {num}\n\n"
-                    f"{ALL[lang_id]} {total_price} {SUM[lang_id]}"
+                    f"{ALL[lang_id]} {total_price} "
                     f"")
 
     # Send the message with the main menu keyboard
     await callback.message.delete()
-    await callback.message.answer(message_text)
+    # await callback.message.answer(message_text)
+    user_id = callback.from_user.id
+    lang_id = db.get_user_language_id(user_id)
+    top_level_categories = db.get_root_categories()
+    print(top_level_categories)
+    if lang_id == 1:
+        # Create a keyboard with category buttons
+        keyboard_product = InlineKeyboardMarkup()
+        for category in top_level_categories:
+            category_name = category[1]  # Replace 'name' with the actual column name
+            keyboard_product.add(InlineKeyboardButton(text='Haridni davom etirish', callback_data=f"category_{category[0]}"))
+
+        # Send the keyboard to the user
+        keyboard_product.add(InlineKeyboardButton(text='🗑 Savatcha', callback_data='show_cart'))
+        await callback.message.answer(text=message_text, reply_markup=keyboard_product)
+    else:
+        keyboard_product = InlineKeyboardMarkup()
+        for category in top_level_categories:
+            category_name = category[2]  # Replace 'name' with the actual column name
+            keyboard_product.add(InlineKeyboardButton(text=category_name, callback_data=f"category_{category[0]}"))
+
+        # Send the keyboard to the user
+        await callback.message.answer(text=message_text, reply_markup=keyboard_product)
     # await bot.send_message(chat_id=user_id, text=message_text)
+
+
+
+@dp.callback_query_handler(text='show_cart')
+async def show_cart(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    lang_id = db.get_user_language_id(user_id)
+
+    # Get all order products for the user
+    orders = db.get_all_order_products(user_id)
+    # Create an InlineKeyboardMarkup
+    keyboard_buy_all = InlineKeyboardMarkup()
+
+    # Create an InlineKeyboardButton
+    buy_all_button = InlineKeyboardButton(f'{BTN_KORZINKA[lang_id]}', callback_data="order_product")
+
+    # Add the button to the keyboard
+    keyboard_buy_all.add(buy_all_button)
+
+    if orders:
+        # Initialize variables for total sum calculation
+        total_sum = 0
+        all_orders_message = f"{AT_KORZINKA[lang_id]}\n"
+
+        for order in orders:
+            order_id = order['id']
+
+            # Check if an order with the same order_id already exists
+            existing_order = db.get_orders_by_order_id(order_id)
+            if existing_order:
+                print(f"Order with ID {order_id} already exists. Skipping...")
+                continue
+
+            # Process each order
+            amount = order['amount']
+            # Remove ".0" if the amount is a whole number
+            formatted_amount = int(amount) if amount.is_integer() else amount
+            product_name = order['product_name_uz']
+            price = order['product_price']
+
+            # Calculate the total price for the current order
+            total_price = round(price * amount, 2)
+
+            # Accumulate the total sum
+            total_sum += total_price
+
+            # Generate the response message for each order
+            order_message = (
+                f"{formatted_amount} x {product_name}\n")
+            # f"Soni: {formatted_amount}\n"
+            # f"Narxi: {price} {SUM[lang_id]}\n\n")
+
+            # Concatenate the order details to the overall message
+            all_orders_message += order_message
+
+            # Print the order information for debugging
+            print(order)
+
+        # Check if total_sum is non-zero before sending the message
+        if total_sum > 0:
+            # Add the total sum to the message
+            all_orders_message += f"Jami summa barchasi uchun: {total_sum} {SUM[lang_id]}"
+            # Send the consolidated message with all order details and total sum
+            await callback.message.edit_text(text=all_orders_message, reply_markup=keyboard_buy_all)
+        else:
+            await callback.answer(text=NO_CART[lang_id])
+
+    else:
+        # If there are no orders, send a message to the user
+        await callback.answer(text=NO_CART[lang_id])
 
 
 
