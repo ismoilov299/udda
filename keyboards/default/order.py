@@ -35,7 +35,7 @@ async def handle_product_request(message: types.Message):
             # Check if an order with the same order_id already exists
             existing_order = db.get_orders_by_order_id(order_id)
             if existing_order:
-                print(f"Order with ID {order_id} already exists. Skipping...")
+
                 continue
 
             # Process each order
@@ -46,7 +46,7 @@ async def handle_product_request(message: types.Message):
             price = order['product_price']
 
             # Calculate the total price for the current order
-            total_price = price * amount
+            total_price = round(price * amount, 2)
 
             # Accumulate the total sum
             total_sum += total_price
@@ -60,13 +60,13 @@ async def handle_product_request(message: types.Message):
             # Concatenate the order details to the overall message
             all_orders_message += order_message
 
-            # Print the order information for debugging
-            print(order)
+
+
 
         # Check if total_sum is non-zero before sending the message
         if total_sum > 0:
             # Add the total sum to the message
-            all_orders_message += f"Jami summa barchasi uchun: {total_sum} {SUM[lang_id]}"
+            all_orders_message += f"Jami summa barchasi uchun: {total_sum}"
             # Send the consolidated message with all order details and total sum
             await message.answer(text=all_orders_message, reply_markup=keyboard_buy_all)
         else:
@@ -88,7 +88,7 @@ async def handle_about(message: types.Message):
     about = db.get_all_about_data()
 
     # Corrected syntax to access 'text_uz' value
-    print(f"{about[0]['text_ru']}")
+
     text_uz = about[0]['text_uz']
     text_ru = about[0]['text_ru']
 

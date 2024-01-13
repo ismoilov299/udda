@@ -8,7 +8,10 @@ class UserAdmin(admin.ModelAdmin):
 
 admin.site.register(User, UserAdmin)
 
+class AdminAdmin(admin.ModelAdmin):
+    list_display = ('first_name', 'chat_id', 'delivery_right', 'stat_right', 'report_right', 'test_right', 'all_right')
 
+admin.site.register(Admin, AdminAdmin)
 
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ('name_uz', 'name_ru', 'name_en', 'parent')

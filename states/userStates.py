@@ -15,6 +15,7 @@ class BuyAllProducts(StatesGroup):
     Name = State()
     PhoneNumber = State()
     ShopName = State()
+    ConfirmShopName = State()
     Location = State()
 
 class SendUserMessageAdmin(StatesGroup):

@@ -37,7 +37,7 @@ async def view_orders(message: types.Message):
                     product_name = product['name_uz']
                     formatted_amount = int(amount) if amount.is_integer() else amount
                     price = product['product_price']
-                    total_price = price * amount
+                    total_price = round(price * amount, 2)
                     total_sum += total_price
 
                     # Generate the response message for each product in the order
@@ -50,8 +50,8 @@ async def view_orders(message: types.Message):
                     orders_message += product_message
 
         # Send the consolidated message with all order details
-        orders_message+= f"\nJammi summa: {total_sum} {SUM[lang_id]}"
-        print(orders_message)
+        orders_message += f"\nJammi summa: {round(total_sum, 2)}"
+
         await message.answer(text=orders_message, parse_mode='html')
     else:
         # If there are no orders, send a message to the user

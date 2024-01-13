@@ -1,5 +1,7 @@
 import uuid
 
+from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
+from django.contrib.auth.models import PermissionsMixin
 from django.db import models
 
 
@@ -18,6 +20,61 @@ class User(models.Model):
         verbose_name = 'Клиенты'
         verbose_name_plural = 'Клиенты'
 
+
+class CustomUserManager(BaseUserManager):
+    def create_user(self, chat_id, password=None, **extra_fields):
+        if not chat_id:
+            raise ValueError('The Chat ID must be set')
+
+        user = self.model(chat_id=chat_id, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, chat_id, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+
+        return self.create_user(chat_id, password, **extra_fields)
+
+
+class Admin(AbstractBaseUser, PermissionsMixin):
+    chat_id = models.IntegerField(unique=True)
+    first_name = models.CharField(max_length=100)
+
+    delivery_right = models.BooleanField(default=False)
+    stat_right = models.BooleanField(default=False)
+    report_right = models.BooleanField(default=False)
+    test_right = models.BooleanField(default=False)
+    all_right = models.BooleanField(default=False)
+
+    objects = CustomUserManager()
+
+    USERNAME_FIELD = 'chat_id'
+    REQUIRED_FIELDS = ['first_name']
+
+    groups = models.ManyToManyField(
+        'auth.Group',
+        verbose_name='groups',
+        blank=True,
+        related_name='admin_groups',
+        related_query_name='admin_group',
+    )
+
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        verbose_name='user permissions',
+        blank=True,
+        related_name='admin_permissions',
+        related_query_name='admin_permission',
+    )
+
+    def __str__(self):
+        return f"{self.first_name} (Admin)"
+
+    class Meta:
+        verbose_name = 'admins'
+        verbose_name_plural = 'admins'
 
 
 class Category(models.Model):
@@ -76,8 +133,6 @@ class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     status = models.IntegerField()
     product_id = models.CharField(max_length=50)
-    longitude = models.FloatField()
-    latitude = models.FloatField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

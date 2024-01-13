@@ -14,6 +14,7 @@ from loader import db, dp, bot
 
 @dp.callback_query_handler(lambda callback: callback.data.startswith('product_'))
 async def handle_product_callback(callback: CallbackQuery, state: FSMContext):
+
     user_id = callback.from_user.id
     lang_id = db.get_user_language_id(user_id)
 
@@ -52,7 +53,7 @@ async def handle_product_callback(callback: CallbackQuery, state: FSMContext):
     price_keyboard1.add(back_button)
 
     product = db.get_product_by_id(product_id)
-    print(product, ' product info')
+
 
     # Choose the appropriate column for product name based on language
     product_name = product[1] if lang_id == 1 else product[2]
@@ -106,6 +107,8 @@ async def on_plus_button_clicked(callback: CallbackQuery, state: FSMContext):
         InlineKeyboardButton('+', callback_data=f'plus_{product_id}_{num}'),
         InlineKeyboardButton(BUY[lang_id], callback_data=f'buy_{product_id}_{num}')
     )
+    back_button = InlineKeyboardButton(text=BACK[lang_id], callback_data="category_1")
+    new_keyboard.add(back_button)
     await callback.answer(f"{num}")
 
     await callback.message.edit_reply_markup(new_keyboard)
@@ -129,6 +132,8 @@ async def on_minus_button_clicked(callback: CallbackQuery, state: FSMContext):
         InlineKeyboardButton('+', callback_data=f'plus_{product_id}_{num}'),
         InlineKeyboardButton(BUY[lang_id], callback_data=f'buy_{product_id}_{num}')
     )
+    back_button = InlineKeyboardButton(text=BACK[lang_id], callback_data="category_1")
+    new_keyboard.add(back_button)
     await callback.answer(f"{num}")
 
     await callback.message.edit_reply_markup(new_keyboard)
@@ -153,7 +158,7 @@ async def on_buy_button_clicked(callback: CallbackQuery, state: FSMContext):
 
     lang_id = db.get_user_language_id(user_id)
     product = db.get_product_by_id(product_id)
-    print(product)
+
     price = product[7]
     total_price = round(product[7] * num, 2)
     if lang_id == 1:
@@ -253,12 +258,12 @@ async def show_cart(callback: types.CallbackQuery):
             all_orders_message += order_message
 
             # Print the order information for debugging
-            print(order)
+
 
         # Check if total_sum is non-zero before sending the message
         if total_sum > 0:
             # Add the total sum to the message
-            all_orders_message += f"Jami summa barchasi uchun: {total_sum} {SUM[lang_id]}"
+            all_orders_message += "Jami summa barchasi uchun: {:.1f}".format(total_sum)
             # Send the consolidated message with all order details and total sum
             await callback.message.edit_text(text=all_orders_message, reply_markup=keyboard_buy_all)
         else:

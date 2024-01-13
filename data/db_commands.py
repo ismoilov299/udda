@@ -1,4 +1,4 @@
-
+import os
 import sqlite3
 import traceback
 from datetime import datetime
@@ -16,13 +16,18 @@ Executing:
 
 class DataBase:
     order_id_counter = 1010
-    def __init__(self, path_to_db='back/db.sqlite3'):
-        self.path_to_db = path_to_db
 
+    def __init__(self, path_to_db='back/db.sqlite3'):
+        self.path_to_db = os.path.abspath(path_to_db)
+        print(f"Database path: {self.path_to_db}")
 
     @property
     def connection(self):
-        return sqlite3.connect(self.path_to_db)
+        try:
+            return sqlite3.connect(self.path_to_db)
+        except sqlite3.Error as e:
+            print("SQLite connection error:", e)
+            raise
 
     def execute(self, sql: str, parameters: tuple = None, fetchone=False, fetchall=False, commit=False):
         if not parameters:
@@ -52,6 +57,13 @@ class DataBase:
         sql = "SELECT * FROM bot_app_user WHERE chat_id = ?"
         user_data = self.execute(sql, (chat_id,), fetchone=True)
         return user_data
+
+    def get_order_by_order_id(self, order_id):
+        # Replace this with the actual query for retrieving order details from your database
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT * FROM bot_app_order WHERE order_id=?", (order_id,))
+        order = cursor.fetchone()
+        return order
 
     def get_user_language_id(self, chat_id: int):
         """
@@ -220,7 +232,7 @@ class DataBase:
 
         return []
 
-    def add_order(self, user_id: int, status: str, product_id: str, longitude: float, latitude: float, created_at: str, order_id: str):
+    def add_order(self, user_id: int, status: str, product_id: str, created_at: str, order_id: str):
         """
         Add a new order to the bot_app_order table.
 
@@ -232,10 +244,10 @@ class DataBase:
         :param created_at: The creation timestamp of the order.
         """
         sql = """
-            INSERT INTO bot_app_order(user_id, status, product_id, longitude, latitude, created_at, order_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO bot_app_order(user_id, status, product_id,  created_at, order_id)
+            VALUES (?, ?, ?,  ?, ?)
         """
-        self.execute(sql, (user_id, status, product_id, longitude, latitude, created_at ,order_id), commit=True)
+        self.execute(sql, (user_id, status, product_id,  created_at ,order_id), commit=True)
 
     def add_order_product(self, user_id: int, product_id: int, amount: int):
         """
@@ -371,6 +383,18 @@ class DataBase:
         orders_data = self.execute(sql, (user_id,), fetchall=True)
         return orders_data
 
+    def get_admin_by_chat_id(self, chat_id: int):
+        """
+        Retrieve admin data from the bot_app_admin table based on the provided chat_id.
+
+        :param chat_id: The chat_id to filter admins.
+        :return: Admin data as a dictionary or None if not found.
+        """
+        sql = "SELECT * FROM bot_app_admin WHERE chat_id = ?"
+        admin_data = self.execute(sql, (chat_id,), fetchone=True)
+        return admin_data
+
+
     def get_orders_by_user_and_status(self, user_id: int):
         """
         Retrieve orders from the bot_app_order table based on the provided user_id and status.
@@ -385,7 +409,7 @@ class DataBase:
 
             if orders_data:
                 # Explicitly list the column names
-                column_names = ['id', 'status', 'product_id', 'longitude', 'latitude', 'created_at', 'user_id', 'order_id']
+                column_names = ['id', 'status', 'product_id',  'created_at', 'user_id', 'order_id']
 
                 # Combine column names with values for each row
                 result_list = [dict(zip(column_names, row)) for row in orders_data]

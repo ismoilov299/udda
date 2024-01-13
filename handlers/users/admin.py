@@ -27,15 +27,14 @@ from states.userStates import SendUserMessageAdmin, AdminBroadcast
 
 
 
-async def inform_admin_about_order(order_id, user_id, product_ids, latitude, longitude, amounts):
-    admin_chat_id = -4130678749
+async def inform_admin_about_order(user_id, order_ids, product_ids, amounts,comment):
+    admin_chat_id = -1002064650084
 
-    print(user_id)
     lang_id = db.get_user_language_id(user_id)
 
     # Fetch orders using db.get_orders_by_user_and_status
     orders = db.get_orders_by_user_and_status(user_id)  # Assuming status 1 is for processed orders
-    print(orders)
+
     keyboard_send_message = InlineKeyboardMarkup()
     send_message_button = InlineKeyboardButton(
         "Send User Message",
@@ -48,23 +47,24 @@ async def inform_admin_about_order(order_id, user_id, product_ids, latitude, lon
         callback_data=f"deactivate_{user_id}"
     )
     user = db.get_user_by_chat_id(user_id)
-    print(user,'user')
+
     user_name = user[1]
     shop_name = user[6]
     user_phone = user[4]
 
     # Add both buttons to the keyboard
-    keyboard_send_message.add(send_message_button, deactivate_button)
+    keyboard_send_message.add( deactivate_button)
+
     if orders:
         total_sum = 0
         # Initialize a message to send order details
         orders_message = (f"<b>Yengi buyurtmalar:</b>\n\n"
                           "<i>Buyurtmalar holati active</>\n"
-                          f"👤Buyurtmachi: {shop_name} dan {user_name} "
+                          f"👤Buyurtmachi: {shop_name} dan {user_name}\n"
                           f"📞Buyurtmachining raqami: +{user_phone} \n\n")
 
-
         for order in orders:
+            print(order)
             print(user)
             # Process each order
             order_id = order['order_id']  # Correct column name for order_id
@@ -73,32 +73,33 @@ async def inform_admin_about_order(order_id, user_id, product_ids, latitude, lon
             # Fetch order products using db.get_order_products_by_order_id
             all_order_products = db.get_order_products_by_id(order_id)
 
-
             if all_order_products:
-                for product in all_order_products:
-                    # Process each product in the order
-                    amount = product['amount']
-                    product_name = product['name_uz']
-                    formatted_amount = int(amount) if amount.is_integer() else amount
-                    price = product['product_price']
-                    total_price = price * amount
-                    total_sum += total_price
+                    for product in all_order_products:
+                        amount = product['amount']
+                        product_name = product['name_uz']
+                        formatted_amount = int(amount) if amount.is_integer() else amount
+                        price = product['product_price']
+                        total_price = price * amount
+                        total_sum += total_price
 
-                    # Generate the response message for each product in the order
-                    product_message = (f"{formatted_amount} x {product_name}\n")
-                                       # f"Soni: {amount}\n"
-                                       # f"Narxi: {price} {SUM[lang_id]}\n\n")
+                        # Generate the response message for each product in the order
+                        product_message = f"{formatted_amount} x {product_name}\n"
 
+                        # Concatenate the product details to the overall message
+                        orders_message += product_message
 
-                    # Concatenate the product details to the overall message
-                    orders_message += product_message
+        # Add the total sum to the order message after processing all orders
+        orders_message += f"\nJammi summa: {round(total_sum, 2)}"
+        if comment != "Yo'q":
+            orders_message += f"Comment: {comment}"
+
 
         # Send the consolidated message with all order details
-        orders_message+= f"\nJammi summa: {total_sum} "
-        print(user)
+        await bot.send_message(chat_id=admin_chat_id, text=orders_message, reply_markup=keyboard_send_message,
+                               parse_mode='html')
+        # await bot.send_location(chat_id=admin_chat_id, longitude=longitude, latitude=latitude)
 
-        await bot.send_message(chat_id=admin_chat_id, text=orders_message, reply_markup=keyboard_send_message, parse_mode='html')
-        await bot.send_location(chat_id=admin_chat_id,longitude=longitude,latitude=latitude)
+
 
 
 @dp.callback_query_handler(lambda query: query.data.startswith('deactivate_'))
@@ -129,9 +130,10 @@ async def process_deactivate_callback(query: CallbackQuery, state: FSMContext):
 @dp.message_handler(state=SendUserMessageAdmin.State)
 async def process_admin_response(message: types.Message, state: FSMContext):
     # Extract user_id from the state
+
     user_id_data = await state.get_data()
     user_id = user_id_data.get('user_id')
-    print(user_id)
+
 
     # Get the admin's response
     admin_response = message.text
@@ -147,7 +149,7 @@ async def process_admin_response(message: types.Message, state: FSMContext):
 async def send_user_message_callback(query: CallbackQuery, state: FSMContext):
     # Extract user_id from callback_data
     user_id = int(query.data.split('_')[2])
-    print(user_id)
+
 
     # Save user_id in the state
     await state.update_data(user_id=user_id)
@@ -166,9 +168,12 @@ async def check_admin(user_id: int) -> bool:
 @dp.message_handler(text='All users')
 async def cmd_all_users(message: types.Message):
     # Check if the user is an admin
-    is_admin = await check_admin(message.from_user.id)
+    admin_id = message.from_user.id
 
-    if is_admin:
+    # Use get_admin_by_chat_id to check if the user is an admin
+    admin_info = db.get_admin_by_chat_id(admin_id)
+
+    if admin_info:
         # Get all users from the database
         all_users = db.get_all_users()
 
@@ -208,7 +213,7 @@ async def process_broadcast(message: types.Message, state: FSMContext):
 
     # Send the broadcast message to all users
     for user in all_users:
-        print(user)
+
         try:
             # Send the message to each user
             await bot.send_message(user[3], broadcast_message)
@@ -264,8 +269,8 @@ async def on_command_day(message: types.Message):
                     bot_app_product ON bot_app_product.id = op.product_id
             """
 
-            print("Executing SQL query:")
-            print(sql_query)
+
+
 
             # Выполнение SQL-запроса с использованием текущей даты
             cursor.execute(sql_query, ('%Y-%m-%d',))
@@ -374,6 +379,24 @@ async def get_group_id(message: types.Message):
     chat_id = message.chat.id
     await message.reply(f"Gruhning ID raqami: {chat_id}")
 
+@dp.message_handler(commands=['id'])
+async def get_group_id(message: types.Message):
+    chat_id = message.from_user.id
+    await message.reply(f"Sizning ID raqamingiz: {chat_id}")
+
+
+@dp.message_handler(commands=['admin_commands'])
+async def admin_commands(message: types.Message):
+    commands_text = ("<b>Admin uchun buyruqlar</b>\n"
+                     "/groupid - <i> gruhning id raqamini olish uchun</i> (buyruq vaqtinchalik)\n"
+                     "/test_stat - <i> test rejimdagi 7 kunlik statistika ma'lumotlari</i> (buyruq vaqtinchalik)\n"
+                     "/stats - <i> 7 kunlik statistik ma'lumotlar ni olish uchun</i>\n"
+                     "/xisobot - <i> kunlik sotuvlar bo'yicha xisobot</i>\n"
+                     "/id - <i> foydalanuvchini id sini tashlaydi (barcha uchun)</i>\n"
+                     "/add_admin - <i> admin larni qo'shish uchun (id orqali)</i>")
+
+    await message.answer(text=commands_text, parse_mode='html')
+
 @dp.message_handler(commands=['stats'])
 async def send_stats(message: types.Message):
     is_admin = await check_admin(message.from_user.id)
@@ -403,26 +426,29 @@ async def send_stats(message: types.Message):
         cursor.execute(query)
         result = cursor.fetchall()
 
+        try:
+            import pandas as pd
+            df = pd.DataFrame(result, columns=['Date', 'Product', 'Amount'])
 
-        import pandas as pd
-        df = pd.DataFrame(result, columns=['Date', 'Product', 'Amount'])
+            plt.figure(figsize=(10, 6))
+            sns.barplot(x='Date', y='Amount', hue='Product', data=df, palette='Set1')
+            sns.set_theme(style="darkgrid")
+            plt.yticks(range(0, max(df['Amount']) + 1, 1))
 
-        plt.figure(figsize=(10, 6))
-        sns.barplot(x='Date', y='Amount', hue='Product', data=df, palette='Set1')
-        sns.set_theme(style="darkgrid")
-        plt.yticks(range(0, max(df['Amount']) + 1, 1))
+            plt.xlabel('Sana')
+            plt.ylabel('Sonni')
+            plt.title('Oxirgi 7 kunlik mahsulot statistikasi')
+            plt.legend(title='Maxsulotlar')
 
-        plt.xlabel('Sana')
-        plt.ylabel('Sonni')
-        plt.title('Oxirgi 7 kunlik mahsulot statistikasi')
-        plt.legend(title='Maxsulotlar')
+            plt.savefig('bar_plot.png')
 
-        plt.savefig('bar_plot.png')
+            conn.close()
 
-        conn.close()
+            photo = types.InputFile('bar_plot.png')
+            await message.reply_photo(photo, caption='Oxirgi 7 kunlik mahsulot statistikasi')
 
-        photo = types.InputFile('bar_plot.png')
-        await message.reply_photo(photo, caption='Oxirgi 7 kunlik mahsulot statistikasi')
+        except:
+            await message.answer("Kechirasiz admin hozir bazada ma'lumotlar yetarli emas")
 
     else:
         await message.answer("Kechirasiz! Siz admin huquqlariga ega emasiz.Bu buyruqdan faqat admin foydalana oladi")

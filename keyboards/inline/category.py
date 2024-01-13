@@ -13,7 +13,7 @@ async def handle_product_request(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     lang_id = db.get_user_language_id(user_id)
     top_level_categories = db.get_root_categories()
-    print(top_level_categories)
+
     if lang_id == 1:
         # Create a keyboard with category buttons
         keyboard_product = InlineKeyboardMarkup()
