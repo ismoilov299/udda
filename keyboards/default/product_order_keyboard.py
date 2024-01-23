@@ -1,6 +1,6 @@
 from aiogram import types
 
-from handlers.users.texts import SUM, NO_ORDERS
+from handlers.users.texts import SUM, NO_ORDERS, TEXT_MY_ORDERS, TEXT_ORDER_ACTIVE, ALL
 from loader import dp, db
 
 
@@ -17,8 +17,8 @@ async def view_orders(message: types.Message):
     if orders:
         total_sum = 0
         # Initialize a message to send order details
-        orders_message = ("<b>📥 Buyurtmalarim:</b>\n\n"
-                          "<i>Buyurtmalar holati active</>\n\n")
+        orders_message = (f"<b>{TEXT_MY_ORDERS[lang_id]}</b>\n\n"
+                          f"<i>{TEXT_ORDER_ACTIVE[lang_id]}</i>\n\n")
 
         for order in orders:
             print(orders)
@@ -50,7 +50,7 @@ async def view_orders(message: types.Message):
                     orders_message += product_message
 
         # Send the consolidated message with all order details
-        orders_message += f"\nJammi summa: {round(total_sum, 2)}"
+        orders_message += f"\n{ALL[lang_id]} {round(total_sum, 2)}"
 
         await message.answer(text=orders_message, parse_mode='html')
     else:

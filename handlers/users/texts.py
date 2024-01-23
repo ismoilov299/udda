@@ -107,7 +107,7 @@ ORDER_NUMBER = {
 
 TEXT_PRODUCT_DESC = {
     1: "Ma'lumot:",
-    2: "Образец текста:"
+    2: "Информация:"
 }
 
 TEXT_GIVE_FEEDBACK = {
@@ -190,4 +190,13 @@ SUM = {
 NO_ZAKAZ = {
     1: "Siz hali birorta buyurtma bermadingiz!",
     2: "Вы еще не разместили ни одного заказа!"
+}
+
+TEXT_MY_ORDERS = {
+    1:"📥 Buyurtmalarim:",
+    2:"📥Мои заказы:"
+}
+TEXT_ORDER_ACTIVE = {
+    1:"Buyurtmalar holati active",
+    2:"Статус заказа активный"
 }

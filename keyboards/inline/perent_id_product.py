@@ -160,7 +160,7 @@ async def on_buy_button_clicked(callback: CallbackQuery, state: FSMContext):
     product = db.get_product_by_id(product_id)
 
     price = product[7]
-    total_price = round(product[7] * num, 2)
+    total_price = round( product[7] * num, 2)
     if lang_id == 1:
         name = product[1]
     else:
@@ -171,7 +171,7 @@ async def on_buy_button_clicked(callback: CallbackQuery, state: FSMContext):
     # await callback.message.delete_reply_markup()
     message_text = (f"{CART[lang_id]}\n\n"
                     f"{name}\n\n"
-                    f"{TEXT_PRODUCT_PRICE[lang_id]} {price} {SUM[lang_id]}\n\n"
+                    f"{TEXT_PRODUCT_PRICE[lang_id]} {price} \n\n"
                     f"{ORDER_NUMBER[lang_id]} {num}\n\n"
                     f"{ALL[lang_id]} {total_price} "
                     f"")

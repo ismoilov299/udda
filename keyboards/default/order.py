@@ -2,7 +2,7 @@ from aiogram import types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from handlers.users.texts import NO_CART, CART_ORDER, BTN_ORDER, BTN_MY_ORDERS, BTN_COMMENTS, BTN_ABOUT_US, \
-    BTN_SETTINGS, KORZINKA, SUM, BTN_KORZINKA, AT_KORZINKA
+    BTN_SETTINGS, KORZINKA, SUM, BTN_KORZINKA, AT_KORZINKA, ALL
 from loader import dp, db
 
 
@@ -66,7 +66,7 @@ async def handle_product_request(message: types.Message):
         # Check if total_sum is non-zero before sending the message
         if total_sum > 0:
             # Add the total sum to the message
-            all_orders_message += f"Jami summa barchasi uchun: {total_sum}"
+            all_orders_message += f"{ALL[lang_id]} {total_sum}"
             # Send the consolidated message with all order details and total sum
             await message.answer(text=all_orders_message, reply_markup=keyboard_buy_all)
         else:

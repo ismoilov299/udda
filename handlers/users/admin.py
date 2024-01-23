@@ -91,7 +91,7 @@ async def inform_admin_about_order(user_id, order_ids, product_ids, amounts,comm
         # Add the total sum to the order message after processing all orders
         orders_message += f"\nJammi summa: {round(total_sum, 2)}"
         if comment != "Yo'q":
-            orders_message += f"Comment: {comment}"
+            orders_message += f"\nComment: {comment}"
 
 
         # Send the consolidated message with all order details
@@ -162,7 +162,7 @@ async def send_user_message_callback(query: CallbackQuery, state: FSMContext):
 
 async def check_admin(user_id: int) -> bool:
     # Implement the logic to check if the user is an admin (e.g., check against a list of admin IDs)
-    admins = [1161180912]  # Replace with actual admin IDs
+    admins = [1330868035]  # Replace with actual admin IDs
     return user_id in admins
 
 @dp.message_handler(text='All users')
@@ -187,7 +187,7 @@ async def cmd_all_users(message: types.Message):
 
 async def check_admin(user_id: int) -> bool:
     # Implement the logic to check if the user is an admin (e.g., check against a list of admin IDs)
-    admins = [1161180912]  # Replace with actual admin IDs
+    admins = [1330868035]  # Replace with actual admin IDs
     return user_id in admins
 
 @dp.message_handler(text='Broadcast')
