@@ -1,7 +1,7 @@
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import CommandStart
-from aiogram.types import ReplyKeyboardRemove
+from aiogram.types import ReplyKeyboardRemove, ChatMemberStatus
 
 from handlers.users import texts
 from handlers.users.texts import BTN_ORDER, BTN_MY_ORDERS, BTN_COMMENTS, BTN_ABOUT_US, BTN_SETTINGS, TEXT_MAIN_MENU, \
@@ -15,54 +15,64 @@ from keyboards.default import start_menu
 @dp.message_handler(CommandStart())
 async def cmd_start(message: types.Message, state: FSMContext):
     # Get user information
-    user_id = message.from_user.id
+    chat_id = -1002081707355
+    try:
+        chat_member = await message.bot.get_chat_member(chat_id, message.from_user.id)
+        if chat_member.status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR]:
 
-    # Check if the user exists in the database
-    user_exists = db.get_user_by_chat_id(user_id)
 
-    if not user_exists:
-        # If the user doesn't exist, add them to the database
-        db.add_user(chat_id=user_id)
+            user_id = message.from_user.id
 
-        # Set the state to IN_LANG and prompt the user to choose a language
-        await UserStates.IN_LANG.set()
+            # Check if the user exists in the database
+            user_exists = db.get_user_by_chat_id(user_id)
 
-        keyboard_lang = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        lang_buttons = [texts.BTN_LANG_UZ, texts.BTN_LANG_RU]
-        keyboard_lang.add(*lang_buttons)
+            if not user_exists:
+                # If the user doesn't exist, add them to the database
+                db.add_user(chat_id=user_id)
 
-        await message.answer(texts.WELCOME_TEXT)
-        await message.answer(texts.CHOOSE_LANG, reply_markup=keyboard_lang)
-    else:
-        # If the user exists, set the state to IN_MENU
-        await UserStates.IN_MENU.set()
+                # Set the state to IN_LANG and prompt the user to choose a language
+                await UserStates.IN_LANG.set()
 
-        user_id = message.from_user.id
-        lang_id = db.get_user_language_id(user_id)
+                keyboard_lang = types.ReplyKeyboardMarkup(resize_keyboard=True)
+                lang_buttons = [texts.BTN_LANG_UZ, texts.BTN_LANG_RU]
+                keyboard_lang.add(*lang_buttons)
 
-        # Continue with your conversation flow for existing users
-        keyboard_menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
+                await message.answer(texts.WELCOME_TEXT)
+                await message.answer(texts.CHOOSE_LANG, reply_markup=keyboard_lang)
+            else:
+                # If the user exists, set the state to IN_MENU
+                await UserStates.IN_MENU.set()
 
-        # Add the first button separately
-        keyboard_menu.add(BTN_ORDER[lang_id])
+                user_id = message.from_user.id
+                lang_id = db.get_user_language_id(user_id)
 
-        # Add the remaining buttons in pairs
-        buttons_menu_row1 = [BTN_MY_ORDERS[lang_id], BTN_ABOUT_US[lang_id]]
-        buttons_menu_row2 = [BTN_COMMENTS[lang_id], BTN_SETTINGS[lang_id], KORZINKA[lang_id]]
+                # Continue with your conversation flow for existing users
+                keyboard_menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
 
-        keyboard_menu.add(*buttons_menu_row1)
-        keyboard_menu.add(*buttons_menu_row2)
+                # Add the first button separately
+                keyboard_menu.add(BTN_ORDER[lang_id])
 
-        # Check if the user is an admin (you need to implement this check)
-        is_admin = await check_admin(user_id)
+                # Add the remaining buttons in pairs
+                buttons_menu_row1 = [BTN_MY_ORDERS[lang_id], BTN_ABOUT_US[lang_id]]
+                buttons_menu_row2 = [BTN_COMMENTS[lang_id], BTN_SETTINGS[lang_id], KORZINKA[lang_id]]
 
-        if is_admin:
-            # Add admin-specific buttons
-            admin_buttons_row = ['All users', 'Broadcast']
-            keyboard_menu.add(*admin_buttons_row)
+                keyboard_menu.add(*buttons_menu_row1)
+                keyboard_menu.add(*buttons_menu_row2)
 
-        await message.answer(text=TEXT_MAIN_MENU[lang_id], reply_markup=keyboard_menu)
-        await state.finish()
+                # Check if the user is an admin (you need to implement this check)
+                is_admin = await check_admin(user_id)
+
+                if is_admin:
+                    # Add admin-specific buttons
+                    admin_buttons_row = ['All users', 'Broadcast']
+                    keyboard_menu.add(*admin_buttons_row)
+
+                await message.answer(text=TEXT_MAIN_MENU[lang_id], reply_markup=keyboard_menu)
+                await state.finish()
+
+    except Exception as e:
+        print(e)
+        pass
 
 async def check_admin(user_id: int) -> bool:
     # Implement the logic to check if the user is an admin (e.g., check against a list of admin IDs)

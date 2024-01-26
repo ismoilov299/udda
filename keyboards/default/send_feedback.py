@@ -2,7 +2,7 @@ from aiogram import types
 from aiogram.contrib.middlewares import logging
 
 from loader import bot
-admin_chat_id = 1161180912
+admin_chat_id = -1002064650084
 
 async def send_feedback_to_admin(feedback: str, feedback_id: int):
     try:
